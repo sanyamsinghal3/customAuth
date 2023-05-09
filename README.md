@@ -1,66 +1,232 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+<p align="center"><a href="" target="_blank">Laravel Auth Login and Registration</a></p>
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+ 
 
-## About Laravel
+## Step 1
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+--Update Route.php file
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+Route::get('/dashboard', function () {
+    return view('welcome');
+});
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+Route::get('register-form', [Auth\RegistrationController::class, 'show'])->name('register.form')->middleware('guest');
+Route::post('store', [Auth\RegistrationController::class, 'Register'])->name('register.store');
+Route::get('login-form', [Auth\LoginController::class, 'show'])->name('login')->middleware('guest');;
+Route::post('submit-login', [Auth\LoginController::class, 'submitLogin'])->name('login.submit');
 
-## Learning Laravel
+Route::get('/home',[Auth\LoginController::class, 'dashboard'])->name('dashboard')->middleware('auth');
+Route::get('logOut', [Auth\LoginController::class, 'logOut'])->name('logOut');
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+## register Contoller under auth folder
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains over 2000 video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+	-- php artisan make:controller Auth/RegistrationController
+	
+	
+namespace App\Http\Controllers\Auth;
 
-## Laravel Sponsors
+use App\Models\User;
+use App\Http\Controllers\Controller;
+use Illuminate\Http\Request;
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the Laravel [Patreon page](https://patreon.com/taylorotwell).
+class RegistrationController extends Controller
+{
+    # display register form
+    public function show(request $request)
+    {
+        return view('auth.registerform');
+    }
 
-### Premium Partners
+    public function Register(request $request)
+    {
+        # validation code
+        $validatedData = $request->validate([
+            'name' 		=> 'required|max:255',
+            'email' 	=> 'required|email|unique:users|max:255',
+            'password' 	=> 'required|min:8|max:255',
+            'mobile' 	=> 'required|min:10|max:11',
+        ]);
 
-- **[Vehikl](https://vehikl.com/)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Cubet Techno Labs](https://cubettech.com)**
-- **[Cyber-Duck](https://cyber-duck.co.uk)**
-- **[Many](https://www.many.co.uk)**
-- **[Webdock, Fast VPS Hosting](https://www.webdock.io/en)**
-- **[DevSquad](https://devsquad.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel/)**
-- **[OP.GG](https://op.gg)**
-- **[WebReinvent](https://webreinvent.com/?utm_source=laravel&utm_medium=github&utm_campaign=patreon-sponsors)**
-- **[Lendio](https://lendio.com)**
+        $user = User::create(request(['name', 'email', 'password']));
+        //auth()->login($user);
 
-## Contributing
+        if(isset($user->id) && ($user->id !='') ) {
+            return redirect()->back()->with('success', 'User created successfully!');
+        } else {
+            return redirect()->back()->with('error','Somethinng went wrong try again.');
+        }
+    }
+}
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+## Login Controller
 
-## Code of Conduct
+ php artisan make:controller Auth/LoginController
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
 
-## Security Vulnerabilities
+namespace App\Http\Controllers\Auth;
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+use App\Http\Controllers\Controller;
+use Illuminate\Http\Request;
+use Auth;
+use Illuminate\Support\Facades\Session;
 
-## License
+class LoginController extends Controller
+{
+    public function show(Request $request)
+    {
+        return view('auth.login');
+    }
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+    public function submitLogin(request $request)
+    {
+        if (auth()->attempt(request(['email', 'password'])) == false) {
+            return back()->with([
+                'error' => 'The email or password is incorrect, please try again'
+            ]);
+        }
+        return redirect()->route('dashboard');
+
+        //return redirect()->back()->with('success', 'User created successfully!');
+    }
+
+    public function logOut() {
+        Session::flush();
+        Auth::logout();
+        return redirect()->route('login');
+    }
+    public function dashboard(request $request)
+    {
+        return view('dashboard');
+    }
+}
+
+
+### create blade view file under auth folder
+
+	auth/login.blade.php and auth/registerform.blade.php
+	
+	--enter this code in login.blade
+	
+	    <div class="cotainer">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card"> 
+                <div class="card-header">Login</div>
+                 <div class="card-body">
+                    <form method="POST" action="{{route('login.submit')}}">
+                        {{ csrf_field() }}
+                        <div class="form-group">
+                            <label for="email">Email:</label>
+                            <input type="email" class="form-control" id="email" name="email">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="password">Password:</label>
+                            <input type="password" class="form-control" id="password" name="password">
+                        </div>
+
+                        <div class="form-group">
+                            <button style="cursor:pointer" type="submit" class="btn btn-primary">Login</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div> 
+
+
+-- enter this code in registerform.blade.php
+
+<div class="cotainer">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card"> 
+                <div class="card-header">Register</div>
+            <div class="card-body">
+                <form name="my-form" action="{{route('register.store')}}" method="post">
+                    @csrf
+                    <div class="form-group row">
+                        <label for="full_name" class="col-md-4 col-form-label text-md-right">Full Name</label>
+                        <div class="col-md-6">
+                            <input type="text" id="full_name" class="form-control" name="name" value="{{ old('name') }}">
+                        </div>
+                        @error('name')
+                        <span class="text-danger" role="alert"> <strong>{{ $message }}</strong></span>
+                        @enderror
+                    </div>
+
+                    <div class="form-group row">
+                        <label for="email_address" class="col-md-4 col-form-label text-md-right">E-Mail Address</label>
+                        <div class="col-md-6">
+                            <input type="text" id="email_address" class="form-control" name="email" value="{{ old('email') }}">
+                        </div>
+                        @error('email')
+                        <span class="text-danger" role="alert"> <strong>{{ $message }}</strong></span>
+                        @enderror
+                    </div>
+
+                    <div class="form-group row">
+                        <label for="email_address" class="col-md-4 col-form-label text-md-right">Password</label>
+                        <div class="col-md-6">
+                            <input type="text" id="password" class="form-control" name="password" >
+                        </div>
+                        @error('password')
+                        <span class="text-danger" role="alert"> <strong>{{ $message }}</strong></span>
+                        @enderror
+                    </div>
+
+                    <div class="form-group row">
+                        <label for="phone_number" class="col-md-4 col-form-label text-md-right">Phone Number</label>
+                        <div class="col-md-6">
+                            <input type="text" id="phone_number" name="mobile" value="{{ old('mobile') }}" class="form-control">
+                        </div>
+                        @error('mobile')
+                        <span class="text-danger" role="alert"> <strong>{{ $message }}</strong></span>
+                        @enderror
+                    </div> 
+                        <div class="col-md-6 offset-md-4">
+                            <button type="submit" class="btn btn-primary">  Register  </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            </div>
+        </div>
+    </div>
+</div> 
+
+
+-- modify dashboard.blade.php registerform.blade.php
+@extends("layout.front.header")
+    @section('pageTitle',"Register")
+    @section('content')
+    {{ auth()->user()->name }}
+
+    @if(session('success'))
+        <div class="alert alert-success">
+            {{ session('success') }}
+        </div>
+    @endif
+
+    @if(session('error'))
+        <div class="alert alert-danger">
+            {{ session('error') }}
+        </div>
+    @endif
+      
+
+@endsection
+
+
+ ###  Run the migrations below
+	php artisan migrate
+
+### added function in user Models.
+
+
+   public function setPasswordAttribute($password)
+    {
+        $this->attributes['password'] = bcrypt($password);
+    }
